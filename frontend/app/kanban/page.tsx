@@ -13,6 +13,33 @@ interface Card {
   listId: number;
   labels?: string[];
   members?: string[];
+  checklists?: Checklist[];
+  coverImage?: string;
+}
+
+interface Checklist {
+  id: string;
+  title: string;
+  items: ChecklistItem[];
+}
+
+interface ChecklistItem {
+  id: string;
+  content: string;
+  isCompleted: boolean;
+}
+
+interface Attachment {
+  id: string;
+  filename: string;
+  url: string;
+}
+
+interface Comment {
+  id: string;
+  content: string;
+  author: string;
+  createdAt: string;
 }
 
 interface List {
@@ -39,6 +66,8 @@ export default function KanbanBoard() {
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [newListTitle, setNewListTitle] = useState('');
   const [showAddList, setShowAddList] = useState(false);
+  const [editingListId, setEditingListId] = useState<number | null>(null);
+  const [editingListTitle, setEditingListTitle] = useState('');
   
   // Drag and Drop State
   const [draggedCard, setDraggedCard] = useState<Card | null>(null);
@@ -48,6 +77,16 @@ export default function KanbanBoard() {
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [showCardModal, setShowCardModal] = useState(false);
   const [cardModalMode, setCardModalMode] = useState<'view' | 'edit'>('view');
+  const [newChecklistTitle, setNewChecklistTitle] = useState('');
+  const [showAddChecklist, setShowAddChecklist] = useState(false);
+  const [newChecklistItem, setNewChecklistItem] = useState('');
+  const [addingItemToChecklist, setAddingItemToChecklist] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [showAddAttachment, setShowAddAttachment] = useState(false);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [boardBackground, setBoardBackground] = useState('gradient-to-br from-slate-900 via-blue-900 to-black');
+  const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
 
   const labels = [
     { id: 'bug', name: 'Bug', color: 'bg-red-500' },
@@ -306,6 +345,33 @@ export default function KanbanBoard() {
     } : null);
   };
 
+  const startEditList = (listId: number, currentTitle: string) => {
+    setEditingListId(listId);
+    setEditingListTitle(currentTitle);
+  };
+
+  const saveEditList = () => {
+    if (!editingListId || !editingListTitle.trim()) return;
+    
+    // In real app, this would call API
+    setBoard(prev => prev ? {
+      ...prev,
+      lists: prev.lists.map(list =>
+        list.id === editingListId
+          ? { ...list, title: editingListTitle }
+          : list
+      )
+    } : null);
+    
+    setEditingListId(null);
+    setEditingListTitle('');
+  };
+
+  const cancelEditList = () => {
+    setEditingListId(null);
+    setEditingListTitle('');
+  };
+
   const clearAllFilters = () => {
     setSearchQuery('');
     setSelectedLabels([]);
@@ -393,6 +459,121 @@ export default function KanbanBoard() {
     closeCardModal();
   };
 
+  const archiveCard = (cardId: string | number) => {
+    if (!confirm('Are you sure you want to archive this card?')) return;
+    
+    // In real app, this would call API to set archived = true
+    setBoard(prev => prev ? {
+      ...prev,
+      lists: prev.lists.map(list => ({
+        ...list,
+        cards: list.cards.filter(card => card.id !== cardId)
+      }))
+    } : null);
+    closeCardModal();
+  };
+
+  const addChecklist = () => {
+    if (!newChecklistTitle.trim() || !selectedCard) return;
+    
+    const newChecklist: Checklist = {
+      id: Date.now().toString(),
+      title: newChecklistTitle,
+      items: []
+    };
+    
+    setBoard(prev => prev ? {
+      ...prev,
+      lists: prev.lists.map(list => ({
+        ...list,
+        cards: list.cards.map(card =>
+          card.id === selectedCard.id
+            ? { ...card, checklists: [...(card.checklists || []), newChecklist] }
+            : card
+        )
+      }))
+    } : null);
+    
+    setNewChecklistTitle('');
+    setShowAddChecklist(false);
+  };
+
+  const addChecklistItem = (checklistId: string) => {
+    if (!newChecklistItem.trim() || !selectedCard) return;
+    
+    const newItem: ChecklistItem = {
+      id: Date.now().toString(),
+      content: newChecklistItem,
+      isCompleted: false
+    };
+    
+    setBoard(prev => prev ? {
+      ...prev,
+      lists: prev.lists.map(list => ({
+        ...list,
+        cards: list.cards.map(card =>
+          card.id === selectedCard.id
+            ? {
+                ...card,
+                checklists: card.checklists?.map(checklist =>
+                  checklist.id === checklistId
+                    ? { ...checklist, items: [...checklist.items, newItem] }
+                    : checklist
+                ) || []
+              }
+            : card
+        )
+      }))
+    } : null);
+    
+    setNewChecklistItem('');
+    setAddingItemToChecklist(null);
+  };
+
+  const toggleChecklistItem = (checklistId: string, itemId: string) => {
+    if (!selectedCard) return;
+    
+    setBoard(prev => prev ? {
+      ...prev,
+      lists: prev.lists.map(list => ({
+        ...list,
+        cards: list.cards.map(card =>
+          card.id === selectedCard.id
+            ? {
+                ...card,
+                checklists: card.checklists?.map(checklist =>
+                  checklist.id === checklistId
+                    ? {
+                        ...checklist,
+                        items: checklist.items.map(item =>
+                          item.id === itemId
+                            ? { ...item, isCompleted: !item.isCompleted }
+                            : item
+                        )
+                      }
+                    : checklist
+                ) || []
+              }
+            : card
+        )
+      }))
+    } : null);
+  };
+
+  const addComment = () => {
+    if (!newComment.trim() || !selectedCard) return;
+    
+    const newCommentObj: Comment = {
+      id: Date.now().toString(),
+      content: newComment,
+      author: 'You',
+      createdAt: new Date().toISOString()
+    };
+    
+    setComments([...comments, newCommentObj]);
+    setNewComment('');
+  };
+
   const getListColor = (position: number) => {
     switch(position) {
       case 0: return 'border-red-500 bg-red-50';
@@ -428,26 +609,63 @@ export default function KanbanBoard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-black">
+    <div className={`min-h-screen ${boardBackground}`}>
       <Navigation />
 
       {/* Board Title Section */}
       <div className="px-6 py-8">
         <div className="max-w-7xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-white mb-2">{board?.title || 'Board'}</h1>
-            <p className="text-gray-400">Last updated: 2 hours ago</p>
+          <div className="mb-8 flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-white mb-2">{board?.title || 'Board'}</h1>
+              <p className="text-gray-400">Last updated: 2 hours ago</p>
+            </div>
+            <div className="relative">
+              <button
+                onClick={() => setShowBackgroundPicker(!showBackgroundPicker)}
+                className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                </svg>
+                Change Background
+              </button>
+              {showBackgroundPicker && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 p-3 z-50">
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      'gradient-to-br from-slate-900 via-blue-900 to-black',
+                      'gradient-to-br from-purple-900 via-pink-900 to-black',
+                      'gradient-to-br from-green-900 via-teal-900 to-black',
+                      'gradient-to-br from-orange-900 via-red-900 to-black',
+                      'gradient-to-br from-gray-800 via-gray-900 to-black',
+                      'bg-gradient-to-r from-blue-400 to-purple-500',
+                    ].map((bg) => (
+                      <button
+                        key={bg}
+                        onClick={() => {
+                          setBoardBackground(bg);
+                          setShowBackgroundPicker(false);
+                        }}
+                        className={`w-12 h-12 rounded-lg ${bg} border-2 ${boardBackground === bg ? 'border-white' : 'border-transparent'} hover:border-white/50 transition-colors`}
+                        title={bg}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Search and Filter Bar */}
-      <div className="px-6 py-4">
+      <div className="px-4 sm:px-6 py-4">
         <div className="max-w-7xl mx-auto">
           <div className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl p-4">
             <div className="flex flex-col sm:flex-row gap-4">
               {/* Search Bar */}
-              <div className="flex-1">
+              <div className="flex-1 w-full">
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -459,7 +677,7 @@ export default function KanbanBoard() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search cards by title..."
-                    className="block w-full pl-10 pr-3 py-2 border border-white/10 rounded-lg leading-5 bg-white/10 backdrop-blur-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    className="block w-full pl-10 pr-4 py-2 border border-white/10 rounded-lg leading-5 bg-white/10 backdrop-blur-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
                 </div>
               </div>
@@ -596,7 +814,7 @@ export default function KanbanBoard() {
             {filteredBoard?.lists.map((list) => (
               <div 
                 key={list.id} 
-                className={`bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl p-3 w-80 flex-shrink-0 shadow-sm ${
+                className={`bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl p-3 w-80 md:w-72 lg:w-80 flex-shrink-0 shadow-sm ${
                   dragOverList === list.id ? 'border-blue-500 bg-blue-50' : getListColor(list.position)
                 }`}
                 onDragOver={(e) => handleDragOver(e, list.id)}
@@ -605,23 +823,68 @@ export default function KanbanBoard() {
               >
                 {/* List Header */}
                 <div className={`flex justify-between items-center mb-3 px-3 py-2 rounded-lg ${getListHeaderColor(list.position)}`}>
-                  <h2 className="text-sm font-semibold text-white">
-                    {list.position === 0 && '🔴 '}{list.position === 1 && '🟡 '}{list.position === 2 && '🟢 '}{list.title}
-                  </h2>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-white bg-white/20 px-2 py-1 rounded-full">
-                      {list.cards.length}
-                    </span>
-                    <button
-                      onClick={() => deleteList(list.id)}
-                      className="text-white/70 hover:text-white transition-colors p-1 rounded hover:bg-white/20"
-                      title="Delete list"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
+                  {editingListId === list.id ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <input
+                        type="text"
+                        value={editingListTitle}
+                        onChange={(e) => setEditingListTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveEditList();
+                          if (e.key === 'Escape') cancelEditList();
+                        }}
+                        className="flex-1 px-2 py-1 text-sm rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        autoFocus
+                      />
+                      <button
+                        onClick={saveEditList}
+                        className="text-green-600 hover:text-green-700 p-1"
+                        title="Save"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={cancelEditList}
+                        className="text-red-600 hover:text-red-700 p-1"
+                        title="Cancel"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <h2 className="text-sm font-semibold text-white cursor-pointer hover:opacity-80" onClick={() => startEditList(list.id, list.title)}>
+                        {list.position === 0 && '🔴 '}{list.position === 1 && '🟡 '}{list.position === 2 && '🟢 '}{list.title}
+                      </h2>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-white bg-white/20 px-2 py-1 rounded-full">
+                          {list.cards.length}
+                        </span>
+                        <button
+                          onClick={() => startEditList(list.id, list.title)}
+                          className="text-white/70 hover:text-white transition-colors p-1 rounded hover:bg-white/20"
+                          title="Edit list"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => deleteList(list.id)}
+                          className="text-white/70 hover:text-white transition-colors p-1 rounded hover:bg-white/20"
+                          title="Delete list"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Cards */}
@@ -698,7 +961,7 @@ export default function KanbanBoard() {
 
             {/* Add List Button */}
             {!showAddList ? (
-              <div className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl p-3 w-80 flex-shrink-0 shadow-sm">
+              <div className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl p-3 w-80 md:w-72 lg:w-80 flex-shrink-0 shadow-sm">
                 <input
                   type="text"
                   value={newListTitle}
@@ -737,7 +1000,7 @@ export default function KanbanBoard() {
             ) : (
               <button
                 onClick={() => setShowAddList(true)}
-                className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl p-3 w-80 flex-shrink-0 text-gray-400 hover:text-gray-600 hover:bg-white/20 transition-colors border-2 border-dashed border-white/20 flex items-center justify-center"
+                className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl p-3 w-80 md:w-72 lg:w-80 flex-shrink-0 text-gray-400 hover:text-gray-600 hover:bg-white/20 transition-colors border-2 border-dashed border-white/20 flex items-center justify-center"
               >
                 <span className="text-lg font-medium">+ Add another list</span>
               </button>
@@ -749,7 +1012,7 @@ export default function KanbanBoard() {
       {/* Card Modal */}
       {showCardModal && selectedCard && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto mx-auto">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-xl font-semibold text-gray-900">
@@ -799,12 +1062,298 @@ export default function KanbanBoard() {
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {/* Card Cover */}
+                  {selectedCard.coverImage && (
+                    <div className="relative h-48 -mx-6 -mt-6 mb-4">
+                      <img
+                        src={selectedCard.coverImage}
+                        alt="Card cover"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        onClick={() => {
+                          if (selectedCard) {
+                            setBoard(prev => prev ? {
+                              ...prev,
+                              lists: prev.lists.map(list => ({
+                                ...list,
+                                cards: list.cards.map(card =>
+                                  card.id === selectedCard.id
+                                    ? { ...card, coverImage: undefined }
+                                    : card
+                                )
+                              }))
+                            } : null);
+                          }
+                        }}
+                        className="absolute top-2 right-2 bg-black/50 text-white p-2 rounded-lg hover:bg-black/70 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Add Cover Button */}
+                  {!selectedCard.coverImage && (
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file && selectedCard) {
+                            const imageUrl = URL.createObjectURL(file);
+                            setBoard(prev => prev ? {
+                              ...prev,
+                              lists: prev.lists.map(list => ({
+                                ...list,
+                                cards: list.cards.map(card =>
+                                  card.id === selectedCard.id
+                                    ? { ...card, coverImage: imageUrl }
+                                    : card
+                                )
+                              }))
+                            } : null);
+                          }
+                        }}
+                        className="hidden"
+                        id="cover-upload"
+                      />
+                      <label
+                        htmlFor="cover-upload"
+                        className="cursor-pointer text-gray-600 hover:text-gray-800"
+                      >
+                        <svg className="w-8 h-8 mx-auto mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span className="text-sm">Add a cover image</span>
+                      </label>
+                    </div>
+                  )}
+
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">{selectedCard.title}</h3>
                     {selectedCard.description && (
                       <p className="text-gray-600 mb-4">{selectedCard.description}</p>
                     )}
                   </div>
+
+                  {/* Checklists */}
+                  <div className="space-y-3">
+                    {selectedCard.checklists && selectedCard.checklists.length > 0 && (
+                      selectedCard.checklists.map(checklist => (
+                        <div key={checklist.id} className="border border-gray-200 rounded-lg p-4">
+                          <div className="flex justify-between items-center mb-3">
+                            <h4 className="text-sm font-medium text-gray-900">{checklist.title}</h4>
+                            <span className="text-xs text-gray-500">
+                              {checklist.items.filter(item => item.isCompleted).length}/{checklist.items.length}
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {checklist.items.map(item => (
+                              <div key={item.id} className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={item.isCompleted}
+                                  onChange={() => toggleChecklistItem(checklist.id, item.id)}
+                                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                />
+                                <span className={`text-sm ${item.isCompleted ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                                  {item.content}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                          {addingItemToChecklist === checklist.id ? (
+                            <div className="mt-3 flex gap-2">
+                              <input
+                                type="text"
+                                value={newChecklistItem}
+                                onChange={(e) => setNewChecklistItem(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') addChecklistItem(checklist.id);
+                                  if (e.key === 'Escape') {
+                                    setAddingItemToChecklist(null);
+                                    setNewChecklistItem('');
+                                  }
+                                }}
+                                placeholder="Add an item..."
+                                className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => addChecklistItem(checklist.id)}
+                                className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                              >
+                                Add
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setAddingItemToChecklist(checklist.id)}
+                              className="mt-3 text-sm text-blue-600 hover:text-blue-700"
+                            >
+                              + Add an item
+                            </button>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Add Checklist Button */}
+                  {!showAddChecklist ? (
+                    <button
+                      onClick={() => setShowAddChecklist(true)}
+                      className="w-full py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                    >
+                      + Add checklist
+                    </button>
+                  ) : (
+                    <div className="border border-gray-300 rounded-lg p-4">
+                      <input
+                        type="text"
+                        value={newChecklistTitle}
+                        onChange={(e) => setNewChecklistTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') addChecklist();
+                          if (e.key === 'Escape') {
+                            setShowAddChecklist(false);
+                            setNewChecklistTitle('');
+                          }
+                        }}
+                        placeholder="Checklist title..."
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={addChecklist}
+                          disabled={!newChecklistTitle.trim()}
+                          className="px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        >
+                          Add
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowAddChecklist(false);
+                            setNewChecklistTitle('');
+                          }}
+                          className="px-4 py-2 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Attachments */}
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-sm font-medium text-gray-900">Attachments</h4>
+                      <span className="text-xs text-gray-500">{attachments.length}</span>
+                    </div>
+                    {attachments.length > 0 && (
+                      <div className="space-y-2">
+                        {attachments.map(attachment => (
+                          <div key={attachment.id} className="flex items-center gap-2 p-2 border border-gray-200 rounded-lg">
+                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                            </svg>
+                            <span className="text-sm text-gray-700 flex-1">{attachment.filename}</span>
+                            <button className="text-gray-400 hover:text-red-500">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {showAddAttachment ? (
+                      <div className="border border-gray-300 rounded-lg p-4">
+                        <input
+                          type="file"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const newAttachment: Attachment = {
+                                id: Date.now().toString(),
+                                filename: file.name,
+                                url: URL.createObjectURL(file)
+                              };
+                              setAttachments([...attachments, newAttachment]);
+                              setShowAddAttachment(false);
+                            }
+                          }}
+                          className="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        />
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            onClick={() => setShowAddAttachment(false)}
+                            className="px-4 py-2 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowAddAttachment(true)}
+                        className="w-full py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                      >
+                        + Add attachment
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Comments */}
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-sm font-medium text-gray-900">Comments</h4>
+                      <span className="text-xs text-gray-500">{comments.length}</span>
+                    </div>
+                    {comments.length > 0 && (
+                      <div className="space-y-3">
+                        {comments.map(comment => (
+                          <div key={comment.id} className="p-3 bg-gray-50 rounded-lg">
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-xs font-bold text-white">
+                                {comment.author.charAt(0)}
+                              </div>
+                              <span className="text-sm font-medium text-gray-700">{comment.author}</span>
+                              <span className="text-xs text-gray-400">
+                                {new Date(comment.createdAt).toLocaleString()}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-600">{comment.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') addComment();
+                        }}
+                        placeholder="Write a comment..."
+                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <button
+                        onClick={addComment}
+                        disabled={!newComment.trim()}
+                        className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                      >
+                        Post
+                      </button>
+                    </div>
+                  </div>
+
                   {selectedCard.dueDate && (
                     <div className="flex items-center text-sm text-gray-500">
                       <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -855,21 +1404,29 @@ export default function KanbanBoard() {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+            <div className="flex justify-between items-center p-6 border-t border-gray-200 bg-gray-50">
               <button
-                onClick={closeCardModal}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                onClick={() => archiveCard(selectedCard?.id || '')}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
               >
-                Cancel
+                Archive
               </button>
-              {cardModalMode === 'edit' && (
+              <div className="flex gap-2">
                 <button
-                  onClick={() => updateCard(selectedCard)}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  onClick={closeCardModal}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
                 >
-                  Save Changes
+                  Cancel
                 </button>
-              )}
+                {cardModalMode === 'edit' && (
+                  <button
+                    onClick={() => updateCard(selectedCard)}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  >
+                    Save Changes
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
