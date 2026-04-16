@@ -215,47 +215,64 @@ taskflow/
 
 ## Deployment
 
-The application is configured for deployment on Render using `render.yaml`.
+The application is configured for deployment on Vercel using `vercel.json`.
 
 ### Environment Variables for Production
-- `DATABASE_URL`: PostgreSQL connection string (Render provides this automatically)
+- `DATABASE_URL`: PostgreSQL connection string (use Vercel Postgres or external PostgreSQL)
 - `PORT`: Backend port (default: 5000)
 - `NODE_ENV`: Set to `production`
-- `NEXT_PUBLIC_API_URL`: Backend API URL (Render provides this automatically)
+- `NEXT_PUBLIC_API_URL`: Backend API URL (Vercel will provide this)
 
-### Deploy to Render
+### Deploy to Vercel
 
-#### Backend Deployment
-1. Push your code to GitHub
-2. Go to [Render.com](https://render.com) and sign up/login
-3. Click "New +" → "Web Service"
-4. Connect your GitHub repository
-5. Select the `backend` folder as the root directory
-6. Configure:
-   - Name: `taskflow-backend`
-   - Runtime: `Node`
-   - Build Command: `npm install`
-   - Start Command: `node index.js`
-   - Environment Variables: Add `DATABASE_URL` (Render will provide this from the database)
-7. Create a PostgreSQL database:
-   - Click "New +" → "PostgreSQL"
-   - Name it `taskflow-db`
-   - Link it to your backend service
-8. Deploy!
+#### Prerequisites
+- Vercel account (sign up at https://vercel.com)
+- GitHub repository connected to Vercel
+- PostgreSQL database (Vercel Postgres or external)
 
-#### Frontend Deployment
-1. Click "New +" → "Web Service"
-2. Select the `frontend` folder as the root directory
-3. Configure:
-   - Name: `taskflow-frontend`
-   - Runtime: `Node`
-   - Build Command: `npm install && npm run build`
-   - Start Command: `npm start`
-   - Environment Variables: Add `NEXT_PUBLIC_API_URL` (your backend Render URL)
-4. Deploy!
+#### Deployment Steps
 
-### Alternative: Using render.yaml
-The repository includes a `render.yaml` file for automated deployment. Render will automatically detect this configuration when you connect your repository.
+1. **Connect Repository to Vercel**
+   - Go to [Vercel Dashboard](https://vercel.com/dashboard)
+   - Click "Add New Project"
+   - Import your GitHub repository: `Satyamannam1983/taskflow`
+
+2. **Configure Environment Variables**
+   - Go to Project Settings → Environment Variables
+   - Add the following:
+     - `DATABASE_URL`: Your PostgreSQL connection string
+     - `NODE_ENV`: `production`
+     - `NEXT_PUBLIC_API_URL`: Your Vercel backend URL (e.g., `https://taskflow-backend.vercel.app`)
+
+3. **Deploy**
+   - Click "Deploy"
+   - Vercel will automatically build and deploy your application
+
+#### Separate Deployments (Alternative)
+
+If you prefer to deploy backend and frontend separately:
+
+**Backend Deployment:**
+1. Set root directory to `backend`
+2. Build Command: `npm install`
+3. Start Command: `node index.js`
+4. Add environment variables
+
+**Frontend Deployment:**
+1. Set root directory to `frontend`
+2. Build Command: `npm install && npm run build`
+3. Output Directory: `.next`
+4. Add `NEXT_PUBLIC_API_URL` environment variable
+
+### Database Setup
+
+#### Option 1: Vercel Postgres
+- Add Vercel Postgres to your Vercel project
+- Copy the connection string to `DATABASE_URL`
+
+#### Option 2: External PostgreSQL
+- Use any PostgreSQL provider (Supabase, Neon, Railway, etc.)
+- Add the connection string to `DATABASE_URL`
 
 ## Assumptions
 
